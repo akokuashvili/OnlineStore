@@ -5,6 +5,7 @@ from apps.accounts.models import User
 from apps.common.utils import generate_unique_code
 from apps.shop.models import Product
 
+
 class ShippingAddress(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='shipping_addresses')
     full_name = models.CharField(max_length=200)
@@ -34,6 +35,7 @@ PAYMENT_STATUS_CHOICES = (
     ("CANCELLED", "CANCELLED"),
     ("FAILED", "FAILED"),
 )
+
 
 class Order(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="orders")
@@ -79,3 +81,5 @@ class OrderItem(BaseModel):
 
     def __str__(self):
         return self.product.name
+
+

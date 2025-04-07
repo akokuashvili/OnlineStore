@@ -1,1 +1,4 @@
 .venv/
+.idea/
+.core/db.sqlite3
+test_passwords.txt
