@@ -1,11 +1,11 @@
 from django.db import models
 from autoslug import AutoSlugField
 
-from apps.common.models import BaseModel, IsDeletedModel
-from apps.sellers.models import Seller
+from ..common.models import BaseModel, IsDeletedModel
+from ..sellers.models import Seller
 
 
-class Catogory(BaseModel):
+class Category(BaseModel):
     name = models.CharField(max_length=100, unique=True)
     slug = AutoSlugField(populate_from='name', unique_with='name', always_update=True)
     image = models.ImageField(upload_to='category_images/')
@@ -24,7 +24,7 @@ class Product(IsDeletedModel):
     description = models.TextField()
     price_old = models.DecimalField(max_digits=10, decimal_places=2, null=True)
     price_current = models.DecimalField(max_digits=10, decimal_places=2)
-    category = models.ForeignKey(Catogory, on_delete=models.CASCADE, related_name='products')
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products')
     in_stock = models.IntegerField(default=5)
 
     image1 = models.ImageField(upload_to='product_images/')

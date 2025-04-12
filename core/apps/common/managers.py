@@ -2,27 +2,23 @@ from django.db import models
 from django.utils import timezone
 
 
-# class GetOrNoneQuerySet(models.QuerySet):
-#     def get_or_none(self, *args, **kwargs):
-#         print(self.model)
-#         try:
-#             return self.get(*args, **kwargs)
-#         except self.model.DoesNotExist:
-#             return None
+class GetOrNoneQuerySet(models.QuerySet):
+    def get_or_none(self, *args, **kwargs):
+        try:
+            return self.get(*args, **kwargs)
+        except self.model.DoesNotExist:
+            return None
 
 
 class GetOrNoneManager(models.Manager):
-    # def get_queryset(self, *args, **kwargs):
-    #     return GetOrNoneQuerySet(self.model)
-    def get_or_none(self, *args, **kwargs):
-        queryset = self.get_queryset()
-        try:
-            return queryset.get(*args, **kwargs)
-        except self.model.DoesNotExist:
-            return
+    def get_queryset(self, *args, **kwargs):
+        return GetOrNoneQuerySet(self.model)
+
+    def get_or_none(self, **kwargs):
+        return self.get_queryset().get_or_none(**kwargs)
 
 
-class IsDeletedQuerySet(models.QuerySet):
+class IsDeletedQuerySet(GetOrNoneQuerySet):
     def delete(self, hard_delete=False):
         if hard_delete:
             return super().delete()

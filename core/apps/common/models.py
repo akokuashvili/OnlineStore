@@ -32,3 +32,6 @@ class IsDeletedModel(BaseModel):
 
     def hard_delete(self, *args, **kwargs):
         super().delete(*args, **kwargs)
+
+
+from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin

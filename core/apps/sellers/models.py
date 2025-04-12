@@ -1,15 +1,15 @@
 from django.db import models
 from autoslug import AutoSlugField
 
-from apps.common.models import BaseModel
-from apps.accounts.models import User
+from ..common.models import BaseModel
+from ..accounts.models import User
 
 
 class Seller(BaseModel):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='seller')
 
     business_name = models.CharField(max_length=200)
-    slug = AutoSlugField(populate_from='business_n2ame', always_update=True, null=True)
+    slug = AutoSlugField(populate_from='business_name', always_update=True, null=True)
     inn_number = models.CharField(max_length=12)
     website_url = models.URLField(null=True, blank=True)
     phone_number = models.CharField(max_length=20)

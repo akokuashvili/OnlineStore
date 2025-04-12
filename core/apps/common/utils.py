@@ -19,3 +19,12 @@ def generate_unique_code(model: BaseModel, field: str) -> str:
     if not similar_object_exists:
         return code
     return generate_unique_code(model, field)
+
+
+class UpdateMixin:
+    """Class adds update method to custom serializer"""
+    def update(self, instance, validated_data: dict):
+        for k, v in validated_data.items():
+            setattr(instance, k, v)
+        instance.save()
+        return instance
