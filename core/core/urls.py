@@ -29,5 +29,7 @@ urlpatterns = [
     path('auth/', include('apps.accounts.urls')),
     path('profiles/', include('apps.profiles.urls')),
     path('sellers/', include('apps.sellers.urls')),
-    path('shop/', include('apps.shop.urls'))
+    path('shop/', include('apps.shop.urls')),
+    path('__debug__/', include('debug_toolbar.urls'))
 ]
+

@@ -1,9 +1,9 @@
 from django.db import models
 
-from apps.common.models import BaseModel
-from apps.accounts.models import User
-from apps.common.utils import generate_unique_code
-from apps.shop.models import Product
+from ..common.models import BaseModel
+from ..accounts.models import User
+from ..common.utils import generate_unique_code
+from ..shop.models import Product
 
 
 class ShippingAddress(BaseModel):
@@ -44,7 +44,6 @@ class Order(BaseModel):
                                        choices=DELIVERY_STATUS_CHOICES)
     payment_status = models.CharField(max_length=20, default="PENDING",
                                       choices=PAYMENT_STATUS_CHOICES)
-
     date_delivered = models.DateTimeField(null=True, blank=True)
 
     # Shipping address details
@@ -56,11 +55,22 @@ class Order(BaseModel):
     country = models.CharField(max_length=100, null=True)
     zipcode = models.CharField(max_length=6, null=True)
 
+    @property
+    def get_cart_subtotal(self):
+        order_items = self.order_items.all()
+        subtotal = sum(item.get_total for item in order_items)
+        return subtotal
+
+    @property
+    def get_cart_total(self):
+        total = self.get_cart_subtotal
+        return total
+
     def __str__(self):
         return f"{self.user.full_name}'s order"
 
     def save(self, *args, **kwargs) -> None:
-        if not self.pk:
+        if not self.created_at:
             self.tx_ref = generate_unique_code(Order, "tx_ref")
         super().save(*args, **kwargs)
 
@@ -75,6 +85,10 @@ class OrderItem(BaseModel):
     @property
     def get_total(self):
         return self.product.price_current * self.quantity
+
+    @property
+    def get_in_stock(self):
+        return self.product.in_stock
 
     class Meta:
         ordering = ['-created_at']

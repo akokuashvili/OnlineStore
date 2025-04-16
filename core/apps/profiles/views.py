@@ -4,12 +4,13 @@ from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
 
 from .serializers import ProfileSerializer, ShippingAddressSerializer
-
-from .models import ShippingAddress
+from ..shop.serializers import OrderSerializer, CheckItemOrderSerializer
+from .models import ShippingAddress, Order, OrderItem
 
 
 profile_tag = ['Profiles']
 shipping_tag = ['Profile Shipping Addresses']
+order_tag = ['Profile Orders']
 
 
 class ProfileView(APIView):
@@ -141,3 +142,39 @@ class ShippingAddressViewID(APIView):
             return Response(data={"message": "Shipping Address does not exist!"}, status=404)
         shipping_address.delete()
         return Response(data={"message": "Shipping address deleted successfully"}, status=200)
+
+
+class OrdersView(APIView):
+    serializer_class = OrderSerializer
+
+    @extend_schema(
+        operation_id="orders_view",
+        summary="Orders Fetch",
+        description="""This endpoint returns all orders for a particular user.""",
+        tags=order_tag
+    )
+    def get(self, request):
+        orders = Order.objects.filter(user=request.user).select_related('user')\
+            .prefetch_related("order_items__product").order_by("-created_at")
+
+        serializer = self.serializer_class(orders, many=True)
+        return Response(data=serializer.data, status=200)
+
+
+class OrderItemsView(APIView):
+    serializer_class = CheckItemOrderSerializer
+
+    @extend_schema(
+        operation_id="order_items_view",
+        summary="Items Order Fetch",
+        description="""This endpoint returns all items order for a particular user.""",
+        tags=order_tag,
+    )
+    def get(self, request, **kwargs):
+        order = Order.objects.filter(user=request.user).get_or_none(tx_ref=kwargs["tx_ref"])
+        if not order:
+            return Response(data={"message": "Order does not exist!"}, status=404)
+        order_items = OrderItem.objects.filter(order=order).\
+            select_related('product__seller__user', 'product__category')
+        serializer = self.serializer_class(order_items, many=True)
+        return Response(data=serializer.data, status=200)
