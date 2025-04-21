@@ -21,4 +21,3 @@ class ShippingAddressSerializer(UpdateMixin, serializers.Serializer):
     country = serializers.CharField()
     zipcode = serializers.CharField(max_length=6)
 
-

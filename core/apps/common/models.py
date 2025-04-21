@@ -24,6 +24,7 @@ class IsDeletedModel(BaseModel):
 
     class Meta:
         abstract = True
+        ordering = ['-created_at']
 
     def delete(self, *args, **kwargs):
         self.is_deleted = True
@@ -33,5 +34,3 @@ class IsDeletedModel(BaseModel):
     def hard_delete(self, *args, **kwargs):
         super().delete(*args, **kwargs)
 
-
-from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin

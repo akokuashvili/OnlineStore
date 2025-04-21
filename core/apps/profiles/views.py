@@ -7,6 +7,8 @@ from .serializers import ProfileSerializer, ShippingAddressSerializer
 from ..shop.serializers import OrderSerializer, CheckItemOrderSerializer
 from .models import ShippingAddress, Order, OrderItem
 
+from ..common.permissions import IsOwner
+
 
 profile_tag = ['Profiles']
 shipping_tag = ['Profile Shipping Addresses']
@@ -15,6 +17,7 @@ order_tag = ['Profile Orders']
 
 class ProfileView(APIView):
     serializer_class = ProfileSerializer
+    permission_classes = [IsOwner]
 
     @extend_schema(
         summary="Retrieve Profile",
@@ -62,6 +65,7 @@ class ProfileView(APIView):
 
 class ShippingAddressView(APIView):
     serializer_class = ShippingAddressSerializer
+    permission_classes = [IsOwner]
 
     @extend_schema(
         summary="Shipping Addresses Fetch",
@@ -90,9 +94,12 @@ class ShippingAddressView(APIView):
 
 class ShippingAddressViewID(APIView):
     serializer_class = ShippingAddressSerializer
+    permission_classes = [IsOwner]
 
-    def get_object(self, user, shipping_id):
-        address = ShippingAddress.objects.get_or_none(user=user, id=shipping_id)
+    def get_object(self, shipping_id):
+        address = ShippingAddress.objects.get_or_none(id=shipping_id)
+        if address:
+            self.check_object_permissions(self.request, address)
         return address
 
     @extend_schema(
@@ -100,9 +107,8 @@ class ShippingAddressViewID(APIView):
         description="""This endpoint returns a single shipping address associated with a user.""",
         tags=shipping_tag,
     )
-    def get(self, request, **kwargs):
-        user = request.user
-        address = self.get_object(user, kwargs['id'])
+    def get(self, request, *args, **kwargs):
+        address = self.get_object(kwargs['id'])
         if not address:
             return Response({"message": "Shipping address doesn't exist"}, status=404)
         serializer = self.serializer_class(instance=address)
@@ -114,7 +120,7 @@ class ShippingAddressViewID(APIView):
         tags=shipping_tag,
     )
     def put(self, request, partial=False, **kwargs):
-        address = self.get_object(request.user, kwargs['id'])
+        address = self.get_object(kwargs['id'])
         if not address:
             return Response({"message": "Shipping address doesn't exist"}, status=404)
         serializer = self.serializer_class(address, data=request.data, partial=partial)
@@ -136,8 +142,7 @@ class ShippingAddressViewID(APIView):
         tags=shipping_tag,
     )
     def delete(self, request, **kwargs):
-        user = request.user
-        shipping_address = self.get_object(user, kwargs["id"])
+        shipping_address = self.get_object(kwargs["id"])
         if not shipping_address:
             return Response(data={"message": "Shipping Address does not exist!"}, status=404)
         shipping_address.delete()
@@ -146,6 +151,7 @@ class ShippingAddressViewID(APIView):
 
 class OrdersView(APIView):
     serializer_class = OrderSerializer
+    permission_classes = [IsOwner]
 
     @extend_schema(
         operation_id="orders_view",
@@ -154,15 +160,21 @@ class OrdersView(APIView):
         tags=order_tag
     )
     def get(self, request):
-        orders = Order.objects.filter(user=request.user).select_related('user')\
+        orders = Order.objects.select_related('user').filter(user=request.user)\
             .prefetch_related("order_items__product").order_by("-created_at")
-
         serializer = self.serializer_class(orders, many=True)
         return Response(data=serializer.data, status=200)
 
 
 class OrderItemsView(APIView):
     serializer_class = CheckItemOrderSerializer
+    permission_classes = [IsOwner]
+
+    def get_object(self, **kwargs):
+        order = Order.objects.get_or_none(tx_ref=kwargs["tx_ref"])
+        if order:
+            self.check_object_permissions(self.request, order)
+        return order
 
     @extend_schema(
         operation_id="order_items_view",
@@ -170,8 +182,8 @@ class OrderItemsView(APIView):
         description="""This endpoint returns all items order for a particular user.""",
         tags=order_tag,
     )
-    def get(self, request, **kwargs):
-        order = Order.objects.filter(user=request.user).get_or_none(tx_ref=kwargs["tx_ref"])
+    def get(self, request, *args, **kwargs):
+        order = self.get_object(**kwargs)
         if not order:
             return Response(data={"message": "Order does not exist!"}, status=404)
         order_items = OrderItem.objects.filter(order=order).\

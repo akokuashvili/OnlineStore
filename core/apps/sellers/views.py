@@ -1,13 +1,17 @@
-from django.shortcuts import render
 from rest_framework.views import APIView
+from rest_framework.viewsets import ModelViewSet
 from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 
-from ..shop.models import Product, Category
 from .models import Seller
-from ..profiles.models import ShippingAddress, Order, OrderItem
+from ..shop.models import Product, Category
+from ..profiles.models import Order
 from .serializers import SellerSerializer
 from ..shop import serializers as shop_serializers
+from ..shop.filters import ProductFilter
+from ..common.permissions import IsSeller
+from ..common.paginations import CustomNumberPagination
+from ..shop.schema_examples import PRODUCT_PARAMS
 
 
 seller_tag = ['Sellers']
@@ -69,20 +73,28 @@ class SellerView(APIView):
 
 class SellerProductsView(APIView):
     serializer_class = shop_serializers.ProductSerializer
+    permission_classes = [IsSeller]
+    filterset_class = ProductFilter
+    pagination_class = CustomNumberPagination
 
     @extend_schema(
         summary="Seller Products Fetch",
         description="""This endpoint returns all products from a seller.
                         Products can be filtered by name, sizes or colors.""",
         tags=seller_tag,
+        parameters=PRODUCT_PARAMS,
     )
     def get(self, request):
-        seller = Seller.objects.get_or_none(user=request.user, is_approved=True)
-        if not seller:
-            return Response(data={"message": "Access is denied"}, status=403)
-        products = Product.objects.select_related('category', 'seller', 'seller__user').filter(seller=seller)
-        serializer = self.serializer_class(instance=products, many=True)
-        return Response(data=serializer.data)
+        seller = Seller.objects.get_or_none(user=request.user)
+        products = Product.objects.select_related('category', 'seller__user').filter(seller=seller)
+        filter_set = self.filterset_class(data=request.query_params, queryset=products)
+        if filter_set.is_valid():
+            f_products = filter_set.qs
+            paginator = self.pagination_class()
+            pf_products = paginator.paginate_queryset(f_products, request)
+            serializer = self.serializer_class(instance=pf_products, many=True)
+            return paginator.get_paginated_response(serializer.data)
+        return Response(data=filter_set.errors, status=400)
 
     @extend_schema(
         summary="Create a product",
@@ -109,6 +121,13 @@ class SellerProductsView(APIView):
 
 class SellerProductView(APIView):
     serializer_class = shop_serializers.CreateProductSerializer
+    permission_classes = [IsSeller]
+
+    def get_object(self, slug):
+        product = Product.objects.select_related('seller__user').get_or_none(slug=slug)
+        if product:
+            self.check_object_permissions(self.request, product)
+        return product
 
     @extend_schema(
         summary="Update a product",
@@ -118,11 +137,9 @@ class SellerProductView(APIView):
         responses=shop_serializers.CreateProductSerializer,
     )
     def put(self, request, slug):
-        product = Product.objects.select_related('seller__user').get_or_none(slug=slug)
+        product = self.get_object(slug)
         if not product:
             return Response(data={"message": "Product does not exist!"}, status=404)
-        if request.user != product.seller.user:
-            return Response(data={"message": "Access is denied"}, status=403)
         old_price = product.price_current
         serializer = self.serializer_class(instance=product, data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -142,35 +159,34 @@ class SellerProductView(APIView):
         tags=seller_tag,
     )
     def delete(self, request, slug):
-        product = Product.objects.select_related('seller__user').get_or_none(slug=slug)
+        product = self.get_object(slug)
         if not product:
             return Response(data={"message": "Product does not exist!"}, status=404)
-        if request.user != product.seller.user:
-            return Response(data={"message": "Access is denied"}, status=403)
         product.delete()
         return Response({"message": "Product deleted successfully"}, status=204)
 
 
-class SellerOrdersView(APIView):
-    serializer_class = shop_serializers.OrderSerializer
-
-    @extend_schema(
+@extend_schema_view(
+    list=extend_schema(
         operation_id="seller_orders_view",
-        summary="Orders with Seller products Fetch",
+        summary="Orders with Seller's products Fetch",
         description="""This endpoint returns all orders contains seller's products.""",
         tags=seller_tag,
     )
-    def get(self, request):
-        seller = request.user.seller
-        # orders = Order.objects.filter(order_items__product__seller=seller)
-        orders = Order.objects.select_related('user').prefetch_related('order_items__product__seller').\
-            filter(order_items__product__seller=seller).distinct()
-        serializer = self.serializer_class(orders, many=True)
-        return Response(serializer.data, status=200)
+)
+class SellerOrdersView(ModelViewSet):
+    serializer_class = shop_serializers.OrderSerializer
+    permission_classes = [IsSeller]
+
+    def get_queryset(self):
+        qs = Order.objects.select_related('user').prefetch_related('order_items__product__seller').\
+            filter(order_items__product__seller=self.request.user.seller).distinct()
+        return qs
 
 
 class SellerOrderItemsView(APIView):
     serializer_class = shop_serializers.CheckItemOrderSerializer
+    permission_classes = [IsSeller]
 
     @extend_schema(
         operation_id="seller_order_items_view",
@@ -187,4 +203,5 @@ class SellerOrderItemsView(APIView):
             filter(product__seller__user=seller)
         serializer = self.serializer_class(seller_items, many=True)
         return Response(data=serializer.data, status=200)
+
 

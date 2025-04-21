@@ -4,6 +4,7 @@ from drf_spectacular.utils import extend_schema_field
 from ..common.utils import UpdateMixin
 from ..sellers.serializers import SellerSerializer
 from ..profiles.serializers import ShippingAddressSerializer
+from ..common.serializers import DymanicFieldSerializer
 
 
 class CategorySerializer(serializers.Serializer):
@@ -18,7 +19,20 @@ class SellerShopSerializer(serializers.Serializer):
     avatar = serializers.CharField(source="user.avatar")
 
 
-class ProductSerializer(serializers.Serializer):
+# class ProductInOrderSerializer(serializers.Serializer):
+#     seller = SellerShopSerializer()
+#     name = serializers.CharField()
+#     slug = serializers.SlugField()
+#     description = serializers.CharField()
+#     price_old = serializers.DecimalField(max_digits=10, decimal_places=2)
+#     price_current = serializers.DecimalField(max_digits=10, decimal_places=2)
+#     category = CategorySerializer()
+#     image1 = serializers.ImageField()
+#     image2 = serializers.ImageField(required=False)
+#     image3 = serializers.ImageField(required=False)
+
+
+class ProductSerializer(DymanicFieldSerializer):
     seller = SellerShopSerializer()
     name = serializers.CharField()
     slug = serializers.SlugField()
@@ -30,6 +44,10 @@ class ProductSerializer(serializers.Serializer):
     image1 = serializers.ImageField()
     image2 = serializers.ImageField(required=False)
     image3 = serializers.ImageField(required=False)
+
+
+# class ProductSerializer(ProductInOrderSerializer):
+#     in_stock = serializers.IntegerField()
 
 
 class CreateProductSerializer(UpdateMixin, serializers.Serializer):
@@ -87,8 +105,11 @@ class OrderSerializer(serializers.Serializer):
 
 
 class CheckItemOrderSerializer(serializers.Serializer):
-    product = ProductSerializer()
+    product = ProductSerializer(exclude_fields=['in_stock'])
     quantity = serializers.IntegerField()
     total = serializers.FloatField(source="get_total")
+
+
+
 
 

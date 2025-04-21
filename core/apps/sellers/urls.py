@@ -8,6 +8,6 @@ urlpatterns = [
     path('', SellerView.as_view(), name='seller'),
     path('products/', SellerProductsView.as_view(), name='sellers_products'),
     path('products/<slug:slug>', SellerProductView.as_view(), name='sellers_products'),
-    path('orders/', SellerOrdersView.as_view()),
+    path('orders/', SellerOrdersView.as_view({'get': 'list'})),
     path('orders/<str:tx_ref>', SellerOrderItemsView.as_view())
 ]

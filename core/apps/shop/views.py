@@ -1,19 +1,25 @@
-from django.shortcuts import render
 from rest_framework.views import APIView
+from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema
+from rest_framework.exceptions import ValidationError
+from drf_spectacular.utils import extend_schema, extend_schema_view
+from django_filters.rest_framework import DjangoFilterBackend
 
 from . import serializers
 from .models import Category, Product
 from ..sellers.models import Seller
 from ..profiles.models import Order, OrderItem, ShippingAddress
-
+from .filters import ProductFilter
+from ..common.permissions import IsOwner, IsStaff
+from ..common.paginations import CustomNumberPagination
+from .schema_examples import PRODUCT_PARAMS
 
 shop_tag = ['Shop']
 
 
 class CategoriesView(APIView):
     serializer_class = serializers.CategorySerializer
+    permission_classes = [IsStaff]
 
     @extend_schema(
         summary="Categories Fetch",
@@ -39,9 +45,11 @@ class CategoriesView(APIView):
 
 
 class DeleteCategoryView(APIView):
+    permission_classes = [IsStaff]
+
     @extend_schema(
         operation_id='delete_category',
-        summary="Category Deleting",
+        summary="Delete a Category",
         description="""This endpoint deletes categories.""",
         tags=shop_tag
     )
@@ -53,19 +61,21 @@ class DeleteCategoryView(APIView):
         return Response(data={"message": "Category deleted successfully"}, status=200)
 
 
-class ListProductView(APIView):
-    serializer_class = serializers.ProductSerializer
-
-    @extend_schema(
+@extend_schema_view(
+    get=extend_schema(
         operation_id="all_products",
         summary="Products Fetch",
         description="""This endpoint returns all products.""",
-        tags=shop_tag
+        tags=shop_tag,
+        parameters=PRODUCT_PARAMS,
     )
-    def get(self, request, *args, **kwargs):
-        products = Product.objects.select_related('category', 'seller__user').all()
-        serializer = self.serializer_class(products, many=True)
-        return Response(data=serializer.data, status=200)
+)
+class ListProductView(ListAPIView):
+    queryset = Product.objects.select_related("category", "seller__user").all()
+    serializer_class = serializers.ProductSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = ProductFilter
+    pagination_class = CustomNumberPagination
 
 
 class ProductByCategoryView(APIView):
@@ -87,22 +97,27 @@ class ProductByCategoryView(APIView):
         return Response(data=serializer.data, status=200)
 
 
-class ProductBySellerView(APIView):
-    serializer_class = serializers.ProductSerializer
-
-    @extend_schema(
+@extend_schema_view(
+    get=extend_schema(
         operation_id="seller_products",
         summary="Seller's Products Fetch",
         description="""This endpoint returns all products of a seller.""",
-        tags=shop_tag
+        tags=shop_tag,
+        parameters=PRODUCT_PARAMS
     )
-    def get(self, request, *args, **kwargs):
-        seller = Seller.objects.get_or_none(slug=kwargs['seller_slug'])
+)
+class ProductBySellerView(ListAPIView):
+    serializer_class = serializers.ProductSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = ProductFilter
+    pagination_class = CustomNumberPagination
+
+    def get_queryset(self):
+        seller = Seller.objects.get_or_none(slug=self.kwargs.get('seller_slug'))
         if not seller:
-            return Response(data={"message": "Seller does not exist!"}, status=404)
-        products = Product.objects.select_related('category', 'seller__user').filter(seller=seller)
-        serializer = self.serializer_class(products, many=True)
-        return Response(data=serializer.data, status=200)
+            raise ValidationError("Seller doesn't exist")
+        return Product.objects.select_related('category', 'seller__user').filter(seller=seller)
+
 
 
 class ProductView(APIView):
@@ -124,12 +139,11 @@ class ProductView(APIView):
 
 class CartView(APIView):
     serializer_class = serializers.OrderItemSerializer
+    permission_classes = [IsOwner]
 
     @extend_schema(
         summary="Cart Items Fetch",
-        description="""
-                This endpoint returns all items in a user cart.
-            """,
+        description="""This endpoint returns all items in a user cart.""",
         tags=shop_tag,
     )
     def get(self, request, *args, **kwargs):
@@ -140,10 +154,8 @@ class CartView(APIView):
 
     @extend_schema(
         summary="Toggle Item in cart",
-        description="""
-                This endpoint allows a user or guest to add/update/remove an item in cart.
-                If quantity is 0, the item is removed from cart
-            """,
+        description="""This endpoint allows a user or guest to add/update/remove an item in cart.
+                        If quantity is 0, the item is removed from cart""",
         tags=shop_tag,
         request=serializers.ToggleCartItemSerializer,
     )
@@ -154,8 +166,6 @@ class CartView(APIView):
         data = serializer.validated_data
         quantity = data["quantity"]
         product = Product.objects.select_related("seller__user").get_or_none(slug=data["slug"])
-        print(product)
-        print(product.in_stock)
         if not product:
             return Response({"message": "No Product with that slug"}, status=404)
         if quantity > product.in_stock:
@@ -183,6 +193,7 @@ class CartView(APIView):
 
 class CheckoutView(APIView):
     serializer_class = serializers.CheckoutSerializer
+    permission_classes = [IsOwner]
 
     @extend_schema(
         summary="Checkout",
@@ -223,4 +234,5 @@ class CheckoutView(APIView):
         order_items.update(order=order)
         serializer = serializers.OrderSerializer(order)
         return Response(data={"message": "Checkout Successful", "item": serializer.data}, status=200)
+
 
