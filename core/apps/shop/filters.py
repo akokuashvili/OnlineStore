@@ -1,6 +1,6 @@
 import django_filters
 
-from .models import Product
+from .models import Product, Review
 
 
 class ProductFilter(django_filters.FilterSet):
@@ -19,3 +19,13 @@ class ProductFilter(django_filters.FilterSet):
     class Meta:
         model = Product
         fields = ['name', 'max_price', 'min_price', 'in_stock', 'created_at']
+
+
+class ReviewFilter(django_filters.FilterSet):
+    created_at = django_filters.DateTimeFilter(lookup_expr='gte')
+    rating = django_filters.NumberFilter(lookup_expr='exact')
+    ordering = django_filters.OrderingFilter(fields=(('rating', 'rating'),))
+
+    class Meta:
+        model = Review
+        fields = ['created_at', 'rating']

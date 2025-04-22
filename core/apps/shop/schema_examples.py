@@ -52,3 +52,31 @@ PRODUCT_PARAMS = [
         type=OpenApiTypes.DATE,
     ),
 ]
+
+
+REVIEWS_PARAMS = [
+    OpenApiParameter(
+        name="page",
+        description="Retrieve a particular page. Defaults to 1",
+        required=False,
+        type=OpenApiTypes.INT,
+    ),
+    OpenApiParameter(
+        name="page_size",
+        description=f"The amount of item per page you want to display. Defaults to {settings.REST_FRAMEWORK['PAGE_SIZE']}",
+        required=False,
+        type=OpenApiTypes.INT,
+    ),
+    OpenApiParameter(
+        name="rating",
+        description="Get reviews with current rating",
+        required=False,
+        type=OpenApiTypes.INT,
+    ),
+    OpenApiParameter(
+        name="ordering",
+        description="Order products by 'rating'",
+        required=False,
+        type=OpenApiTypes.STR,
+    ),
+]

@@ -1,18 +1,19 @@
 from django.shortcuts import render
 from rest_framework.views import APIView
+from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from .serializers import ProfileSerializer, ShippingAddressSerializer
-from ..shop.serializers import OrderSerializer, CheckItemOrderSerializer
+from ..shop.serializers import OrderSerializer, CheckItemOrderSerializer, ReviewSerializer
 from .models import ShippingAddress, Order, OrderItem
-
+from ..shop.models import Review, Product
 from ..common.permissions import IsOwner
+from ..common.paginations import CustomNumberPagination
 
 
 profile_tag = ['Profiles']
-shipping_tag = ['Profile Shipping Addresses']
-order_tag = ['Profile Orders']
+profile_address = ['Profile Shipping Info']
 
 
 class ProfileView(APIView):
@@ -70,7 +71,7 @@ class ShippingAddressView(APIView):
     @extend_schema(
         summary="Shipping Addresses Fetch",
         description="""This endpoint returns all shipping addresses associated with a user.""",
-        tags=shipping_tag,
+        tags=profile_address,
     )
     def get(self, request, *args, **kwargs):
         shipping_addresses = ShippingAddress.objects.filter(user=request.user)
@@ -80,7 +81,7 @@ class ShippingAddressView(APIView):
     @extend_schema(
         summary="Create Shipping Address",
         description="""This endpoint allows a user to create a shipping address.""",
-        tags=shipping_tag,
+        tags=profile_address,
     )
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data)
@@ -92,7 +93,7 @@ class ShippingAddressView(APIView):
         return Response(data=serializer.data, status=status)
 
 
-class ShippingAddressViewID(APIView):
+class ShippingAddressDetailView(APIView):
     serializer_class = ShippingAddressSerializer
     permission_classes = [IsOwner]
 
@@ -105,7 +106,7 @@ class ShippingAddressViewID(APIView):
     @extend_schema(
         summary="Shipping Address Fetch ID",
         description="""This endpoint returns a single shipping address associated with a user.""",
-        tags=shipping_tag,
+        tags=profile_address,
     )
     def get(self, request, *args, **kwargs):
         address = self.get_object(kwargs['id'])
@@ -117,7 +118,7 @@ class ShippingAddressViewID(APIView):
     @extend_schema(
         summary="Update Shipping Address ID",
         description="""This endpoint allows a user to update shipping address.""",
-        tags=shipping_tag,
+        tags=profile_address,
     )
     def put(self, request, partial=False, **kwargs):
         address = self.get_object(kwargs['id'])
@@ -131,7 +132,7 @@ class ShippingAddressViewID(APIView):
     @extend_schema(
         summary="Partial Update Shipping Address ID",
         description="""This endpoint allows a user to partial update shipping address.""",
-        tags=shipping_tag,
+        tags=profile_address,
     )
     def patch(self, request, **kwargs):
         return self.put(request, partial=True, **kwargs)
@@ -139,7 +140,7 @@ class ShippingAddressViewID(APIView):
     @extend_schema(
         summary="Delete Shipping Address ID",
         description="""This endpoint allows a user to delete shipping address.""",
-        tags=shipping_tag,
+        tags=profile_address,
     )
     def delete(self, request, **kwargs):
         shipping_address = self.get_object(kwargs["id"])
@@ -157,7 +158,7 @@ class OrdersView(APIView):
         operation_id="orders_view",
         summary="Orders Fetch",
         description="""This endpoint returns all orders for a particular user.""",
-        tags=order_tag
+        tags=profile_tag
     )
     def get(self, request):
         orders = Order.objects.select_related('user').filter(user=request.user)\
@@ -180,7 +181,7 @@ class OrderItemsView(APIView):
         operation_id="order_items_view",
         summary="Items Order Fetch",
         description="""This endpoint returns all items order for a particular user.""",
-        tags=order_tag,
+        tags=profile_tag,
     )
     def get(self, request, *args, **kwargs):
         order = self.get_object(**kwargs)
@@ -190,3 +191,25 @@ class OrderItemsView(APIView):
             select_related('product__seller__user', 'product__category')
         serializer = self.serializer_class(order_items, many=True)
         return Response(data=serializer.data, status=200)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="reviews_fetch",
+        summary="Fetch all your reviews",
+        description="""This endpoint returns all your reviews.""",
+        tags=profile_tag,
+    )
+)
+class ReviewsListView(ListAPIView):
+    serializer_class = ReviewSerializer
+    permission_classes = [IsOwner]
+    pagination_class = CustomNumberPagination
+
+    def get(self, request, *args, **kwargs):
+        reviews = self.request.user.reviews.select_related('product')
+        # reviews = Review.objects.select_related('user', 'product').filter(user=request.user)
+        serializer = self.serializer_class(reviews, many=True, exclude_fields=['full_name'])
+        return Response(data={'full_name': request.user.full_name,
+                              'reviews': serializer.data}, status=200)
+

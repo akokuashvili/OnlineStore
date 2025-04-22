@@ -1,6 +1,6 @@
 from django.db import models
 
-from ..common.models import BaseModel
+from ..common.models import BaseModel, IsDeletedModel
 from ..accounts.models import User
 from ..common.utils import generate_unique_code
 from ..shop.models import Product
@@ -90,10 +90,8 @@ class OrderItem(BaseModel):
     def get_in_stock(self):
         return self.product.in_stock
 
-    class Meta:
-        ordering = ['-created_at']
-
     def __str__(self):
         return self.product.name
 
-
+    class Meta:
+        ordering = ['-created_at']

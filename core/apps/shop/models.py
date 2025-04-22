@@ -3,6 +3,7 @@ from autoslug import AutoSlugField
 
 from ..common.models import BaseModel, IsDeletedModel
 from ..sellers.models import Seller
+from ..accounts.models import User
 
 
 class Category(BaseModel):
@@ -31,5 +32,28 @@ class Product(IsDeletedModel):
     image2 = models.ImageField(upload_to='product_images/', blank=True)
     image3 = models.ImageField(upload_to='product_images/', blank=True)
 
+    @property
+    def get_rating(self):
+        rating = self.reviews.aggregate(models.Avg('rating'))['rating__avg']
+        return rating
+
+    @property
+    def get_reviews_count(self):
+        return self.reviews.count()
+
     def __str__(self):
         return self.name
+
+
+class Review(IsDeletedModel):
+    RATING_CHOICES = (
+        (1, 1), (2, 2), (3, 3), (4, 4), (5, 5)
+    )
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reviews')
+    rating = models.PositiveIntegerField(null=True, choices=RATING_CHOICES)
+    text = models.TextField(null=True)
+
+    class Meta:
+        unique_together = ['user', 'product']

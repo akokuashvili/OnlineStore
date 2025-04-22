@@ -29,3 +29,4 @@ class IsStaff(BasePermission):
             return True
         return request.user.is_staff
 
+
